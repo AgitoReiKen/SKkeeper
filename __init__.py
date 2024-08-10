@@ -18,15 +18,15 @@
 ##  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 bl_info = {
-        "name": "SKkeeper",
-        "author": "Johannes Rauch",
-        "version": (1, 6),
-        "blender": (2, 80, 3),
-        "location": "Search > Apply modifiers (Keep Shapekeys)",
-        "description": "Applies modifiers and keeps shapekeys",
-        "category": "Utility",
-        "wiki_url": "https://github.com/smokejohn/SKkeeper",
-        }
+    "name": "SKkeeper",
+    "author": "Johannes Rauch",
+    "version": (1, 6),
+    "blender": (2, 80, 3),
+    "location": "Search > Apply modifiers (Keep Shapekeys)",
+    "description": "Applies modifiers and keeps shapekeys",
+    "category": "Utility",
+    "wiki_url": "https://github.com/smokejohn/SKkeeper",
+}
 
 import time
 
@@ -34,32 +34,35 @@ import bpy
 from bpy.types import Operator, PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty
 
+
 def log(msg):
-    """ prints to console in the following format:
-        <SKkeeper Time(HH:MM)> message
+    """prints to console in the following format:
+    <SKkeeper Time(HH:MM)> message
     """
     t = time.localtime()
     current_time = time.strftime("%H:%M", t)
     print("<SKkeeper {}> {}".format(current_time, (msg)))
+
 
 def copy_object(obj, times=1, offset=0):
     # TODO: maybe get the collection of the source and link the object to
     # that collection instead of the scene main collection
 
     objects = []
-    for i in range(0,times):
+    for i in range(0, times):
         copy_obj = obj.copy()
         copy_obj.data = obj.data.copy()
-        copy_obj.name = obj.name + "_shapekey_" + str(i+1)
-        copy_obj.location.x += offset*(i+1)
+        copy_obj.name = obj.name + "_shapekey_" + str(i + 1)
+        copy_obj.location.x += offset * (i + 1)
 
         bpy.context.collection.objects.link(copy_obj)
         objects.append(copy_obj)
 
     return objects
 
+
 def duplicate_object(obj, times=1, offset=0):
-    """ duplicates the given object and its data """
+    """duplicates the given object and its data"""
 
     # DEPRECATED >> USE copy_object instead
 
@@ -73,14 +76,15 @@ def duplicate_object(obj, times=1, offset=0):
     for i in range(0, times):
         bpy.ops.object.duplicate()
         copy = bpy.context.active_object
-        copy.name = obj.name + "_shapekey_" + str(i+1)
+        copy.name = obj.name + "_shapekey_" + str(i + 1)
         copy.location.x += offset
         objects.append(copy)
 
     return objects
 
+
 def apply_shapekey(obj, sk_keep):
-    """ deletes all shapekeys except the one with the given index """
+    """deletes all shapekeys except the one with the given index"""
     shapekeys = obj.data.shape_keys.key_blocks
 
     # check for valid index
@@ -95,13 +99,14 @@ def apply_shapekey(obj, sk_keep):
     # remove the chosen one and bake it into the object
     obj.shape_key_remove(shapekeys[0])
 
+
 def apply_modifiers(obj):
-    """ applies all modifiers in order """
+    """applies all modifiers in order"""
     # now uses object.convert to circumvent errors with disabled modifiers
 
     modifiers = obj.modifiers
     for modifier in modifiers:
-        if modifier.type == 'SUBSURF':
+        if modifier.type == "SUBSURF":
             modifier.show_only_control_edges = False
 
     for o in bpy.context.scene.objects:
@@ -110,23 +115,25 @@ def apply_modifiers(obj):
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
 
-    bpy.ops.object.convert(target='MESH')
+    bpy.ops.object.convert(target="MESH")
 
     # for mod in modifiers:
     #     bpy.ops.object.modifier_apply(apply_as='DATA', modifier=mod.name)
 
+
 def remove_modifiers(obj):
-    """ removes all modifiers from the object """
+    """removes all modifiers from the object"""
 
     for i in reversed(range(0, len(obj.modifiers))):
         modifier = obj.modifiers[i]
         obj.modifiers.remove(modifier)
 
+
 def apply_subdmod(obj):
-    """ applies subdivision surface modifier """
+    """applies subdivision surface modifier"""
 
     # get subsurface modifier/s
-    modifiers = [mod for mod in obj.modifiers if mod.type == 'SUBSURF']
+    modifiers = [mod for mod in obj.modifiers if mod.type == "SUBSURF"]
 
     for o in bpy.context.scene.objects:
         o.select_set(False)
@@ -135,14 +142,15 @@ def apply_subdmod(obj):
     modifiers[0].show_only_control_edges = False
     bpy.ops.object.modifier_apply(modifier=modifiers[0].name)
 
+
 def apply_modifier(obj, modifier_name):
-    """ applies a specific modifier """
+    """applies a specific modifier"""
 
     log("Applying chosen modifier")
     log(obj)
 
     modifier = [mod for mod in obj.modifiers if mod.name == modifier_name][0]
-    
+
     # deselect all
     for o in bpy.context.scene.objects:
         o.select_set(False)
@@ -150,8 +158,9 @@ def apply_modifier(obj, modifier_name):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=modifier.name)
 
+
 def add_objs_shapekeys(destination, sources):
-    """ takes an array of objects and adds them as shapekeys to the destination object """
+    """takes an array of objects and adds them as shapekeys to the destination object"""
     for o in bpy.context.scene.objects:
         o.select_set(False)
 
@@ -161,49 +170,52 @@ def add_objs_shapekeys(destination, sources):
     bpy.context.view_layer.objects.active = destination
     bpy.ops.object.join_shapes()
 
+
 class SK_TYPE_Resource(PropertyGroup):
     selected: BoolProperty(name="Selected", default=False)
 
+
 class SK_OT_apply_mods_SK(Operator):
-    """ Applies modifiers and keeps shapekeys """
+    """Applies modifiers and keeps shapekeys"""
+
     bl_idname = "sk.apply_mods_sk"
     bl_label = "Apply All Modifiers (Keep Shapekeys)"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     def validate_input(self, obj):
         # GUARD CLAUSES | USER ERROR
 
         # check for valid selection
         if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "No Active object. Please select an object")
+            return {"CANCELLED"}
 
         # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
+        if self.obj.type != "MESH":
+            self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
+            return {"CANCELLED"}
 
         # check for shapekeys
         if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
+            return {"CANCELLED"}
 
         # check for multiple shapekeys
         if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object only has a base shapekey")
+            return {"CANCELLED"}
 
         # check for modifiers
         if len(self.obj.modifiers) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object doesn't have any modifiers")
+            return {"CANCELLED"}
 
     def execute(self, context):
         self.obj = context.active_object
 
         # check for valid object
-        if self.validate_input(self.obj) == {'CANCELLED'}:
-            return {'CANCELLED'}
+        if self.validate_input(self.obj) == {"CANCELLED"}:
+            return {"CANCELLED"}
 
         # VALID OBJECT
 
@@ -239,7 +251,6 @@ class SK_OT_apply_mods_SK(Operator):
             bpy.data.objects.remove(blendshape)
             bpy.data.meshes.remove(mesh_data)
 
-
         # delete the original and its mesh data
         orig_name = self.obj.name
         orig_data = self.obj.data
@@ -249,49 +260,54 @@ class SK_OT_apply_mods_SK(Operator):
         # rename the receiver
         receiver.name = orig_name
 
-        return {'FINISHED'}
+        return {"FINISHED"}
+
 
 class SK_OT_apply_subd_SK(Operator):
-    """ Applies modifiers and keeps shapekeys """
+    """Applies modifiers and keeps shapekeys"""
+
     bl_idname = "sk.apply_subd_sk"
     bl_label = "Apply All Subdivision (Keep Shapekeys)"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     def validate_input(self, obj):
         # GUARD CLAUSES | USER ERROR
 
         # check for valid selection
         if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "No Active object. Please select an object")
+            return {"CANCELLED"}
 
         # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
+        if self.obj.type != "MESH":
+            self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
+            return {"CANCELLED"}
 
         # check for shapekeys
         if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
+            return {"CANCELLED"}
 
         # check for multiple shapekeys
         if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object only has a base shapekey")
+            return {"CANCELLED"}
 
         # check for subd modifiers
-        subd = [mod for mod in self.obj.modifiers if mod.type == 'SUBSURF']
+        subd = [mod for mod in self.obj.modifiers if mod.type == "SUBSURF"]
         if len(subd) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any subdivision surface modifiers")
-            return {'CANCELLED'}
+            self.report(
+                {"ERROR"},
+                "The selected object doesn't have any subdivision surface modifiers",
+            )
+            return {"CANCELLED"}
 
     def execute(self, context):
         self.obj = context.active_object
 
         # check for valid object
-        if self.validate_input(self.obj) == {'CANCELLED'}:
-            return {'CANCELLED'}
+        if self.validate_input(self.obj) == {"CANCELLED"}:
+            return {"CANCELLED"}
 
         # VALID OBJECT
 
@@ -327,7 +343,6 @@ class SK_OT_apply_subd_SK(Operator):
             bpy.data.objects.remove(blendshape)
             bpy.data.meshes.remove(mesh_data)
 
-
         # delete the original and its mesh data
         orig_name = self.obj.name
         orig_data = self.obj.data
@@ -337,15 +352,17 @@ class SK_OT_apply_subd_SK(Operator):
         # rename the receiver
         receiver.name = orig_name
 
-        return {'FINISHED'}
+        return {"FINISHED"}
+
 
 class SK_OT_apply_mods_choice_SK(Operator):
-    """ Applies modifiers and keeps shapekeys """
+    """Applies modifiers and keeps shapekeys"""
+
     bl_idname = "sk.apply_mods_choice_sk"
     bl_label = "Apply Chosen Modifiers (Keep Shapekeys)"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
-    resource_list : CollectionProperty(name="Modifier List", type=SK_TYPE_Resource)
+    resource_list: CollectionProperty(name="Modifier List", type=SK_TYPE_Resource)
 
     def invoke(self, context, event):
         self.obj = context.active_object
@@ -354,28 +371,28 @@ class SK_OT_apply_mods_choice_SK(Operator):
 
         # check for valid selection
         if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "No Active object. Please select an object")
+            return {"CANCELLED"}
 
         # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
+        if self.obj.type != "MESH":
+            self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
+            return {"CANCELLED"}
 
         # check for shapekeys
         if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
+            return {"CANCELLED"}
 
         # check for multiple shapekeys
         if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object only has a base shapekey")
+            return {"CANCELLED"}
 
         # check for modifiers
         if len(self.obj.modifiers) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "The selected object doesn't have any modifiers")
+            return {"CANCELLED"}
 
         # populate the resource_list
         self.resource_list.clear()
@@ -446,22 +463,24 @@ class SK_OT_apply_mods_choice_SK(Operator):
         # rename the receiver
         receiver.name = orig_name
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     def draw(self, context):
-        """ Draws the resource selection GUI """
+        """Draws the resource selection GUI"""
         layout = self.layout
         col = layout.column(align=True)
         for entry in self.resource_list:
             row = col.row()
-            row.prop(entry, 'selected', text=entry.name)
+            row.prop(entry, "selected", text=entry.name)
+
 
 classes = (
-        SK_TYPE_Resource,
-        SK_OT_apply_mods_SK,
-        SK_OT_apply_subd_SK,
-        SK_OT_apply_mods_choice_SK
-        )
+    SK_TYPE_Resource,
+    SK_OT_apply_mods_SK,
+    SK_OT_apply_subd_SK,
+    SK_OT_apply_mods_choice_SK,
+)
+
 
 def modifier_panel(self, context):
     layout = self.layout
@@ -470,15 +489,18 @@ def modifier_panel(self, context):
     layout.operator("sk.apply_subd_sk")
     layout.operator("sk.apply_mods_choice_sk")
 
+
 def register():
     from bpy.utils import register_class
+
     for cls in classes:
         register_class(cls)
+    bpy.types.VIEW3D_MT_object_apply.append(modifier_panel)
 
-    bpy.types.VIEW3D_MT_object.append(modifier_panel)
 
 def unregister():
     from bpy.utils import unregister_class
+
     for cls in classes:
         unregister_class(cls)
 

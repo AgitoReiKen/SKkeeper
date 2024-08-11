@@ -115,10 +115,11 @@ def apply_modifiers(obj):
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
 
-    bpy.ops.object.convert(target="MESH")
+    # bpy.ops.object.convert(target="MESH")
 
-    # for mod in modifiers:
-    #     bpy.ops.object.modifier_apply(apply_as='DATA', modifier=mod.name)
+    for mod in modifiers:
+        if mod.type != "ARMATURE":
+            bpy.ops.object.modifier_apply(modifier=mod.name)
 
 
 def remove_modifiers(obj):
@@ -195,15 +196,15 @@ class SK_OT_apply_mods_SK(Operator):
             self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
             return {"CANCELLED"}
 
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
-            return {"CANCELLED"}
+        # # check for shapekeys
+        # if not self.obj.data.shape_keys:
+        #     self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
+        #     return {"CANCELLED"}
 
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({"ERROR"}, "The selected object only has a base shapekey")
-            return {"CANCELLED"}
+        # # check for multiple shapekeys
+        # if len(self.obj.data.shape_keys.key_blocks) == 1:
+        #     self.report({"ERROR"}, "The selected object only has a base shapekey")
+        #     return {"CANCELLED"}
 
         # check for modifiers
         if len(self.obj.modifiers) == 0:
@@ -218,7 +219,9 @@ class SK_OT_apply_mods_SK(Operator):
             return {"CANCELLED"}
 
         # VALID OBJECT
-
+        if self.obj.data.shape_keys is None:
+            apply_modifiers(self.obj)
+            return {"FINISHED"}
         # get the shapekey names
         sk_names = []
         for block in self.obj.data.shape_keys.key_blocks:
@@ -283,15 +286,15 @@ class SK_OT_apply_subd_SK(Operator):
             self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
             return {"CANCELLED"}
 
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
-            return {"CANCELLED"}
+        # # check for shapekeys
+        # if not self.obj.data.shape_keys:
+        #     self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
+        #     return {"CANCELLED"}
 
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({"ERROR"}, "The selected object only has a base shapekey")
-            return {"CANCELLED"}
+        # # check for multiple shapekeys
+        # if len(self.obj.data.shape_keys.key_blocks) == 1:
+        #     self.report({"ERROR"}, "The selected object only has a base shapekey")
+        #     return {"CANCELLED"}
 
         # check for subd modifiers
         subd = [mod for mod in self.obj.modifiers if mod.type == "SUBSURF"]
@@ -310,6 +313,9 @@ class SK_OT_apply_subd_SK(Operator):
             return {"CANCELLED"}
 
         # VALID OBJECT
+        if self.obj.data.shape_keys is None:
+            apply_modifiers(self.obj)
+            return {"FINISHED"}
 
         # get the shapekey names
         sk_names = []
@@ -379,15 +385,15 @@ class SK_OT_apply_mods_choice_SK(Operator):
             self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
             return {"CANCELLED"}
 
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
-            return {"CANCELLED"}
+        # # check for shapekeys
+        # if not self.obj.data.shape_keys:
+        #     self.report({"ERROR"}, "The selected object doesn't have any shapekeys")
+        #     return {"CANCELLED"}
 
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({"ERROR"}, "The selected object only has a base shapekey")
-            return {"CANCELLED"}
+        # # check for multiple shapekeys
+        # if len(self.obj.data.shape_keys.key_blocks) == 1:
+        #     self.report({"ERROR"}, "The selected object only has a base shapekey")
+        #     return {"CANCELLED"}
 
         # check for modifiers
         if len(self.obj.modifiers) == 0:
@@ -406,6 +412,11 @@ class SK_OT_apply_mods_choice_SK(Operator):
     def execute(self, context):
 
         # VALID OBJECT
+        if self.obj.data.shape_keys is None:
+            for entry in self.resource_list:
+                if entry.selected:
+                    apply_modifier(self.obj, entry.name)
+            return {"FINISHED"}
 
         # get the shapekey names
         sk_names = []
@@ -474,11 +485,54 @@ class SK_OT_apply_mods_choice_SK(Operator):
             row.prop(entry, "selected", text=entry.name)
 
 
+class SK_OT_bake_keyshape_animation(Operator):
+    """Bakes keyshape values into keyframes"""
+
+    bl_idname = "sk.bake_keyshape_animation"
+    bl_label = "Bake keyshapes into keyframes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def invoke(self, context, event):
+        self.obj = context.active_object
+
+        # GUARD CLAUSES | USER ERROR
+
+        # check for valid selection
+        if not self.obj:
+            self.report({"ERROR"}, "No Active object. Please select an object")
+            return {"CANCELLED"}
+
+        # check for valid obj-type
+        if self.obj.type != "MESH":
+            self.report({"ERROR"}, "Wrong object type. Please select a MESH object")
+            return {"CANCELLED"}
+
+        if self.obj.data.shape_keys is None:
+            self.report({"ERROR"}, "No shape keys present in selected object")
+            return {"CANCELLED"}
+
+    def execute(self, context):
+
+        context = bpy.context
+        scene = context.scene
+        self.obj = context.active_object
+        frame = scene.frame_start
+
+        while frame <= scene.frame_end:
+            scene.frame_set(frame)
+            for fcurve in self.obj.data.shape_keys.animation_data.drivers.values():
+                self.obj.data.shape_keys.keyframe_insert(fcurve.data_path)
+            frame = frame + 1
+
+        return {"FINISHED"}
+
+
 classes = (
     SK_TYPE_Resource,
     SK_OT_apply_mods_SK,
     SK_OT_apply_subd_SK,
     SK_OT_apply_mods_choice_SK,
+    SK_OT_bake_keyshape_animation,
 )
 
 
@@ -488,6 +542,7 @@ def modifier_panel(self, context):
     layout.operator("sk.apply_mods_sk")
     layout.operator("sk.apply_subd_sk")
     layout.operator("sk.apply_mods_choice_sk")
+    layout.operator("sk.bake_keyshape_animation")
 
 
 def register():
@@ -504,4 +559,4 @@ def unregister():
     for cls in classes:
         unregister_class(cls)
 
-    bpy.types.VIEW3D_MT_object.remove(modifier_panel)
+    bpy.types.VIEW3D_MT_object_apply.remove(modifier_panel)

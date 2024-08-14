@@ -28,20 +28,9 @@ bl_info = {
     "wiki_url": "https://github.com/agitoreiken/SKkeeper",
 }
 
-import time
-
 import bpy
 from bpy.types import Operator, PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty
-
-
-def log(msg):
-    """prints to console in the following format:
-    <SKkeeper Time(HH:MM)> message
-    """
-    t = time.localtime()
-    current_time = time.strftime("%H:%M", t)
-    print("<SKkeeper {}> {}".format(current_time, (msg)))
 
 
 def copy_object(obj, times=1, offset=0):
@@ -137,36 +126,6 @@ def remove_modifiers(obj):
         obj.modifiers.remove(modifier)
 
 
-def apply_subdmod(obj):
-    """applies subdivision surface modifier"""
-
-    # get subsurface modifier/s
-    modifiers = [mod for mod in obj.modifiers if mod.type == "SUBSURF"]
-
-    for o in bpy.context.scene.objects:
-        o.select_set(False)
-    bpy.context.view_layer.objects.active = obj
-
-    modifiers[0].show_only_control_edges = False
-    bpy.ops.object.modifier_apply(modifier=modifiers[0].name)
-
-
-def apply_modifier(obj, modifier_name):
-    """applies a specific modifier"""
-
-    log("Applying chosen modifier")
-    log(obj)
-
-    modifier = [mod for mod in obj.modifiers if mod.name == modifier_name][0]
-
-    # deselect all
-    for o in bpy.context.scene.objects:
-        o.select_set(False)
-
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier=modifier.name)
-
-
 def add_objs_shapekeys(destination, sources):
     """takes an array of objects and adds them as shapekeys to the destination object"""
     for o in bpy.context.scene.objects:
@@ -197,7 +156,7 @@ class SK_OT_apply_mods(Operator):
             ),
         ],
         default="ALL_MODIFIERS",
-    )
+    )  # type: ignore
 
     def validate_input(self):
         if len(self.objects) == 0:
@@ -422,7 +381,7 @@ class SK_OT_toggle_shapekeys_drivers(Operator):
             ("UNMUTE", "Unmute", "Unmute the drivers"),
         ],
         default="TOGGLE",
-    )
+    )  # type: ignore
 
     def validate_input(self):
         # check for valid selection
@@ -486,8 +445,6 @@ classes = (
 def modifier_panel(self, context):
     layout = self.layout
     layout.separator()
-    # layout.operator("sk.apply_mods_sk")
-    # layout.operator("sk.apply_subd_sk")
     layout.operator("sk.apply_mods")
 
 

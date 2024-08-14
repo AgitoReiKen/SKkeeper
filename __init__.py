@@ -118,6 +118,14 @@ def apply_modifiers(self, obj):
                 bpy.ops.object.modifier_remove(modifier=mod.name)
 
 
+def reset_pose(obj):
+    for bone in obj.pose.bones:
+        bone.location = (0.0, 0.0, 0.0)
+        bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+        bone.rotation_euler = (0.0, 0.0, 0.0)
+        bone.rotation_euler = (1.0, 1.0, 1.0)
+
+
 def remove_modifiers(obj):
     """removes all modifiers from the object"""
 
@@ -136,6 +144,22 @@ def add_objs_shapekeys(destination, sources):
 
     bpy.context.view_layer.objects.active = destination
     bpy.ops.object.join_shapes()
+
+
+def reset_armature_pose(objects):
+    processed_armature = []
+    for obj in objects:
+        armature = next(
+            (
+                modifier
+                for modifier in obj.modifiers
+                if modifier.type == "ARMATURE" and modifier.object
+            ),
+            None,
+        )
+        if armature and armature.object not in processed_armature:
+            reset_pose(armature.object)
+            processed_armature.append(armature)
 
 
 class SK_OT_apply_mods(Operator):
@@ -157,6 +181,11 @@ class SK_OT_apply_mods(Operator):
         ],
         default="ALL_MODIFIERS",
     )  # type: ignore
+    reset_pose: bpy.props.BoolProperty(
+        name="Reset armature pose",
+        description="Reset linked armature poses?",
+        default=True,
+    )  # type: ignore
 
     def validate_input(self):
         if len(self.objects) == 0:
@@ -170,6 +199,9 @@ class SK_OT_apply_mods(Operator):
         self.objects = [obj for obj in context.selected_objects if obj.type == "MESH"]
         if not self.validate_input():
             return {"CANCELLED"}
+
+        if self.reset_pose:
+            reset_armature_pose(self.objects)
 
         if self.action == "ALL_MODIFIERS":
             self.apply_all_modifiers(context)
@@ -203,7 +235,13 @@ class SK_OT_apply_mods(Operator):
                 # restore the shapekey name
                 sk = receiver.data.shape_keys.key_blocks[i]
                 sk.name = obj_sk.name
-
+                sk.mute = obj_sk.mute
+                sk.slider_min = obj_sk.slider_min
+                sk.slider_max = obj_sk.slider_max
+                sk.value = obj_sk.value
+                sk.interpolation = obj_sk.interpolation
+                sk.lock_shape = obj_sk.lock_shape
+                sk.vertex_group = obj_sk.vertex_group
                 # delete the blendshape donor and its mesh datablock (save memory)
                 mesh_data = blendshape.data
                 bpy.data.objects.remove(blendshape)
@@ -211,53 +249,20 @@ class SK_OT_apply_mods(Operator):
 
             # rename id, copy action, drivers, nla tracks
             # proper sk.id_data name, applied after object has been deleted to avoid .000 postfix
-            skidname = f"{obj.name}.SK"
+            skid_name = f"{obj.name}.SK"
 
-            objskid = obj.data.shape_keys.key_blocks[0].id_data
+            obj_skid = obj.data.shape_keys.key_blocks[0].id_data
             skid = receiver.data.shape_keys.key_blocks[0].id_data
-            objskid.animation_data_create()
+            obj_skid.animation_data_create()
             skid.animation_data_create()
-            obj_anim_data = objskid.animation_data
-            anim_data = skid.animation_data
-            if obj_anim_data and obj_anim_data.nla_tracks:
-                for track in obj_anim_data.nla_tracks:
-                    print(f"Track Name: {track.name}")
-                    print(f"Muted: {track.mute}")
-                    print(f"Is Solo: {track.is_solo}")
-
-                    # Iterate through each strip in the track
-                    for strip in track.strips:
-                        print(f"  Strip Name: {strip.name}")
-                        print(
-                            f"  Action: {strip.action.name if strip.action else 'None'}"
-                        )
-                        print(f"  Frame Start: {strip.frame_start}")
-                        print(f"  Frame End: {strip.frame_end}")
-                        print(f"  Use Animated Time: {strip.use_animated_time}")
-
-            if anim_data and anim_data.nla_tracks:
-                for track in anim_data.nla_tracks:
-                    print(f"Track Name: {track.name}")
-                    print(f"Muted: {track.mute}")
-                    print(f"Is Solo: {track.is_solo}")
-
-                    # Iterate through each strip in the track
-                    for strip in track.strips:
-                        print(f"  Strip Name: {strip.name}")
-                        print(
-                            f"  Action: {strip.action.name if strip.action else 'None'}"
-                        )
-                        print(f"  Frame Start: {strip.frame_start}")
-                        print(f"  Frame End: {strip.frame_end}")
-                        print(f"  Use Animated Time: {strip.use_animated_time}")
 
             # copy action
-            if objskid.animation_data.action:
-                skid.animation_data.action = objskid.animation_data.action.copy()
+            if obj_skid.animation_data.action:
+                skid.animation_data.action = obj_skid.animation_data.action.copy()
 
             # copy drivers
-            if objskid.animation_data.drivers:
-                for driver in objskid.animation_data.drivers:
+            if obj_skid.animation_data.drivers:
+                for driver in obj_skid.animation_data.drivers:
                     new_driver = skid.driver_add(driver.data_path)
                     new_driver.driver.type = driver.driver.type
                     new_driver.mute = driver.mute
@@ -279,8 +284,8 @@ class SK_OT_apply_mods(Operator):
                             new_var.targets[i].transform_type = target.transform_type
 
             # copy nla tracks
-            if objskid.animation_data.nla_tracks:
-                for track in objskid.animation_data.nla_tracks:
+            if obj_skid.animation_data.nla_tracks:
+                for track in obj_skid.animation_data.nla_tracks:
                     new_track = skid.animation_data.nla_tracks.new()
                     new_track.name = track.name
                     new_track.is_solo = track.is_solo
@@ -306,7 +311,7 @@ class SK_OT_apply_mods(Operator):
             bpy.data.objects.remove(obj)
             bpy.data.meshes.remove(orig_data)
 
-            skid.name = skidname
+            skid.name = skid_name
 
             # rename the receiver
             receiver.name = orig_name
@@ -314,7 +319,6 @@ class SK_OT_apply_mods(Operator):
     def apply_all_modifiers(self, context):
         self.next_selection = []
         for obj in self.objects:
-            # VALID OBJECT
             if obj.data.shape_keys is not None:
                 self.next_selection.append(obj)
                 continue
@@ -328,12 +332,75 @@ class SK_OT_apply_mods(Operator):
         return {"FINISHED"}
 
 
+BAKE_SHAPEKEY_ANIMATION_FRAME_START = None
+BAKE_SHAPEKEY_ANIMATION_FRAME_END = None
+BAKE_SHAPEKEY_ANIMATION_EXECUTE = False
+
+
 class SK_OT_bake_shapekey_animation(Operator):
     """Bakes shapekey values into keyframes"""
 
     bl_idname = "sk.bake_shapekey_animation"
     bl_label = "Bake shapekey animation into keyframes"
     bl_options = {"REGISTER", "UNDO"}
+    variable1 = 1
+    variable2: 23
+
+    def set_start_frame(self, value):
+        global BAKE_SHAPEKEY_ANIMATION_FRAME_START
+        scene = bpy.context.scene
+        BAKE_SHAPEKEY_ANIMATION_FRAME_START = max(
+            scene.frame_start, min(value, scene.frame_end)
+        )
+
+    def set_end_frame(self, value):
+        global BAKE_SHAPEKEY_ANIMATION_FRAME_END
+        scene = bpy.context.scene
+        BAKE_SHAPEKEY_ANIMATION_FRAME_END = max(
+            scene.frame_start, min(value, scene.frame_end)
+        )
+
+    def get_start_frame(self):
+        global BAKE_SHAPEKEY_ANIMATION_FRAME_START
+        if BAKE_SHAPEKEY_ANIMATION_FRAME_START is None:
+            SK_OT_bake_shapekey_animation.set_start_frame(self, 0)
+        return BAKE_SHAPEKEY_ANIMATION_FRAME_START
+
+    def get_end_frame(self):
+        global BAKE_SHAPEKEY_ANIMATION_FRAME_END
+        if BAKE_SHAPEKEY_ANIMATION_FRAME_END is None:
+            SK_OT_bake_shapekey_animation.set_end_frame(self, 0)
+        return BAKE_SHAPEKEY_ANIMATION_FRAME_END
+
+    start_frame: bpy.props.IntProperty(
+        name="Start Frame",
+        description="The starting frame of the range",
+        set=set_start_frame,
+        get=get_start_frame,
+    )
+
+    end_frame: bpy.props.IntProperty(
+        name="End Frame",
+        description="The ending frame of the range",
+        set=set_end_frame,
+        get=get_end_frame,
+    )
+
+    def set_execute(self, value):
+        global BAKE_SHAPEKEY_ANIMATION_EXECUTE
+        BAKE_SHAPEKEY_ANIMATION_EXECUTE = value
+
+    def get_execute(self):
+        global BAKE_SHAPEKEY_ANIMATION_EXECUTE
+        return BAKE_SHAPEKEY_ANIMATION_EXECUTE
+
+    execute_ot: bpy.props.BoolProperty(
+        name="Execute",
+        description="Press to execute the operator",
+        default=False,
+        set=set_execute,
+        get=get_execute,
+    )
 
     def validate_input(self):
         # check for valid selection
@@ -346,6 +413,9 @@ class SK_OT_bake_shapekey_animation(Operator):
         return True
 
     def execute(self, context):
+        if not self.execute_ot:
+            return {"FINISHED"}
+        self.report({"INFO"}, "Baked keyframes")
         self.objects = [
             obj
             for obj in context.selected_objects
@@ -354,15 +424,15 @@ class SK_OT_bake_shapekey_animation(Operator):
         if not self.validate_input():
             return {"CANCELLED"}
 
-        context = bpy.context
         scene = context.scene
-
-        for frame in range(scene.frame_start, scene.frame_end + 1):
+        for frame in range(
+            BAKE_SHAPEKEY_ANIMATION_FRAME_START, BAKE_SHAPEKEY_ANIMATION_FRAME_END + 1
+        ):
             scene.frame_set(frame)
             for obj in self.objects:
                 for fcurve in obj.data.shape_keys.animation_data.drivers.values():
                     obj.data.shape_keys.keyframe_insert(fcurve.data_path, frame=frame)
-
+        self.execute_ot = False
         return {"FINISHED"}
 
 

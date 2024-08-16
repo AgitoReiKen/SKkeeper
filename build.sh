@@ -1,10 +1,11 @@
 #!/bin/bash
 
-name=SKkeeper
-version=v1.6
-folder=./SKkeeper
+name=ShKeeper
+version=v2.0
+folder=./ShKeeper
 
-mkdir "$folder"
-cp __init__.py "$folder"
-zip -r "${name}_${version}.zip" "$folder"
-rm -r "$folder"
+mkdir "./release"
+mkdir "./release/$folder"
+cp __init__.py "./release/$folder"
+tar -a -c -f "./release/${name}_${version}.zip" "./release/$folder"
+rm -r "./release/$folder"

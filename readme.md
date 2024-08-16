@@ -1,27 +1,41 @@
 # Blender Addon - SKkeeper
-![SKkeeper Logo splash](images/skkeeper_splash.png)
-This Addon automates the process of collapsing down modifiers on a mesh with shapekeys while keeping the shapekeys intact.
+![Info](images/Info.png)
+ShKeeper is a Blender add-on designed to manage shape keys and modifiers efficiently. It allows you to apply modifiers while preserving shape keys, bake shape key animations, and toggle shape key drivers.
 
 ## How to Install
 
-Download the zipfile from the [Releases page](https://github.com/smokejohn/SKkeeper/releases) and install via Blenders Addon-Preferences
+Download the zipfile from the [Releases page](https://github.com/agitoreiken/shkeeper/releases) and install via Blenders Addon-Preferences
 
-Edit > Preferences > Add-ons > Install... > Select SKkeeper.zip
+Edit > Preferences > Add-ons > Install... > Select ShKeeper.zip
+ 
+## Features
 
-## How to Use
+### 1. Apply Modifiers
+Applies all modifiers to selected mesh objects while optionally preserving shape keys.
 
-This Addon adds 3 new operators which can be found in the 3DViews Object Menu:
+- **Location:** Object > Apply > All Modifiers
+- **How to Use:**
+  1. Select the mesh objects.
+  2. Go to `Object > Apply > All Modifiers`.
+  3. Choose whether to apply all modifiers or retain shape keys.
+  4. Optionally, reset the armature pose.
 
-<img style="margin-right: 30px;" align="left" src="images/bl_gui_3DVIEW_MT_object.png"/>
+### 2. Bake Shape Key Animation
+Bakes shape key animations into keyframes for selected mesh objects.
 
-* **Sk: Apply All Modifiers (Keep Shapekeys)**
-  * Applies all modifiers on the object
-* **Sk: Apply Subdivision (Keep Shapekeys)**
-  * Applies only the top most subdivision modifier and keeps the others
-* **Sk: Apply Chosen Modifiers (Keep Shapekeys)**
-  * Shows a popup with all modifiers on the object and only applies those you select
-  * Might lead to unexpected behaviour if you choose to apply modifiers that aren't at the top of the modifier stack
+- **Location:** Object > Animation > Bake Shape Key Animation
+- **How to Use:**
+  1. Select mesh objects with shape keys.
+  2. Go to `Object > Animation > Bake Shape Key Animation`.
+  3. Set the start and end frames.
+  4. Execute the bake operation.
 
-Select the Object you want to apply modifiers to and select one of the options.
+### 3. Toggle Shape Key Drivers
+Toggles, mutes, or unmutes drivers on shape keys for selected mesh objects.
 
-you can also search for the operators via the Quick Search floater (**Hotkey: F3**) and typing "shapekey" or other keywords in the names of the operators.
+- **Location:** Object > Animation > Toggle Shape Key Drivers
+- **How to Use:**
+  1. Select mesh objects with shape keys.
+  2. Go to `Object > Animation > Toggle Shape Key Drivers`.
+  3. Choose the action (Toggle, Mute, Unmute).
+  4. Execute the operation.

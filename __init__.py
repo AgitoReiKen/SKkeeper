@@ -18,7 +18,7 @@
 ##  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 bl_info = {
-    "name": "SKkeeper",
+    "name": "ShKeeper",
     "author": "Johannes Rauch, AgitoReiKen",
     "version": (2, 0),
     "blender": (4, 1, 0),

@@ -2,6 +2,7 @@
 ![Info](images/Info.png)
 
 ShKeeper is a Blender add-on designed to manage shape keys and modifiers efficiently. 
+
 It allows you to apply modifiers while preserving shape keys, bake shape key animations, and toggle shape key drivers.
 
 ## How to Install
